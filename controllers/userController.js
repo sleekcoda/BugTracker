@@ -1,7 +1,6 @@
 const {
   users,
-  query
-} = require("../prisma/client");
+  query} = require("../prisma/client");
 const bcrypt = require("bcryptjs");
 const jwtGenerator = require("../utils/jwtGenerator");
 
@@ -10,13 +9,9 @@ module.exports = {
 
 
     try {
-      const {
-        rows
-      } = await query(
-        "SELECT id, first_name, last_name, phone, email, user_authority FROM users"
-      );
+      const result= await users.findMany({take:10});
 
-      res.json(rows);
+      res.json(result);
     } catch (err) {
       res.status(500).json({
         msg: "Unable to get users from database"

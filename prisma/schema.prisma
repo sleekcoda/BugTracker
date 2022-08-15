@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output = "./generated/client"
 }
 
 datasource db {
@@ -32,7 +33,7 @@ model Users {
 model Tickets {
   id            Int          @id @default(autoincrement())
   title         String
-  projectId     Int?
+  projectId     String?
   description   String?      @default("No description")
   priority      Priorities   @default(LOW)
   type          TicketType   @default(SUPPORT)
@@ -72,8 +73,8 @@ model Comments {
 // }
 
 model Projects {
-  id          Int       @id @default(autoincrement())
-  title       String
+  id          String       @id @default(uuid())
+  name        String
   description String
   Tickets     Tickets[]
   Users       Users?    @relation(fields: [userId], references: [id])
