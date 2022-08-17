@@ -7,18 +7,13 @@ const jwtGenerator = require("../utils/jwtGenerator");
 module.exports = {
   getAll: async (req, res) => {
 
-
     try {
-      const result= await users.findMany({take:10});
-
-      res.json(result);
+      const row= await users.findMany({take:10});
+      res.json(row);
     } catch (err) {
       res.status(500).json({
         msg: "Unable to get users from database"
       });
-    } finally {
-      console.log("Error getting users from database: ", err);
-      // await client.release();
     }
   },
   addUser: async (req, res) => {
@@ -47,15 +42,6 @@ module.exports = {
       //password encryption before adding to DB
       const salt = await bcrypt.genSaltSync(10);
       const passwordHash = await bcrypt.hashSync(password, salt);
-
-      //Add new user to DB
-      //BUG: camel casel columns getting converted to lowercase
-      // pg pool always convert camel cased column names to lowercase and postgres is case sensitive
-
-      // const newUser = await client.query(
-      //   `INSERT INTO users (first_Name, lastName, phone, email, passwordHash, userAuthority) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      //   [firstName, lastName, phone, email, hash, userAuth]
-      // );
 
       //TODO: ADD prisma client to perform the register user query
 
@@ -124,16 +110,11 @@ module.exports = {
     try {
       console.log("connected to postgres Pool");
 
-      const {
-        rows
-      } = await query(
-        "SELECT id FROM users WHERE email = $1",
-        [email]
-      );
+      const row = await users.findFirst({where:{email}})
 
-      console.log(`query result: ${rows}`);
+      console.log(`query result: ${row}`);
 
-      res.json(rows);
+      res.json(row);
     } catch (err) {
       console.log(`Failed to get user: `, "\n", err);
       res.status(400).json({
