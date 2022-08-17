@@ -1,82 +1,115 @@
-const pool = require("../db");
+const {
+  users,
+  ticketAssignee
+} = require("../prisma/client");
 
 module.exports = {
   assignDev: async (req, res) => {
-    const { ticketId } = req.params;
-    const { devId } = req.body; // If there are multiple users to assign, this will be handled on front end
-    const client = await pool.connect();
+    const {
+      ticketId
+    } = req.params;
+    const {
+      userId
+    } = req.body; // If there are multiple users to assign, this will be handled on front end
 
     try {
-      await client.query(
-        "INSERT INTO dev_assignments (ticket_id, user_id) VALUES ($1, $2)",
-        [ticketId, devId]
-      );
-
+      await ticketAssignee.create({
+        data: {
+          ticketId,
+          userId
+        }
+      })
       res
         .status(201)
-        .json({ msg: `User ${devId} assigned to ${ticketId} succesfully` });
+        .json({
+          msg: `User ${devId} assigned to ${ticketId} succesfully`
+        });
     } catch (err) {
       console.log("assignUsers query error: ", err);
       res
         .status(400)
-        .json({ msg: "Please review user project assign creation query" });
-    } finally {
-      await client.release();
+        .json({
+          msg: "Please review user project assign creation query"
+        });
     }
   },
 
   removeDev: async (req, res) => {
-    const { devId } = req.body;
-    const client = await pool.connect();
+    const {
+      userId
+    } = req.body;
+    const {
+      ticketId
+    } = req.params;
 
     try {
-      await client.query("DELETE FROM dev_assignments WHERE id = $1", [devId]);
+      const {
+        id
+      } = await ticketAssignee.findFirst({
+        where: {
+          ticketId,
+          userId
+        }
+      })
+      const deleted = await ticketAssignee.delete({
+        where: {
+          id
+        }
+      })
 
-      res.json(`User removed from ticket`);
+      res.json(`User removed from ticket`); 
     } catch (err) {
       console.log("getProject query error: ", err);
       res
         .status(500)
-        .json({ msg: "Unable to remove dev assignment from database" });
-    } finally {
-      await client.release();
+        .json({
+          msg: "Unable to remove dev assignment from database"
+        });
     }
   },
   getAssignedDevs: async (req, res) => {
-    const { ticketId } = req.params;
-    const client = await pool.connect();
+    const {
+      ticketId
+    } = req.params;
 
     try {
-      const {
-        rows,
-      } = await client.query(
-        "SELECT user_id, first_name, last_name, phone, email FROM users JOIN dev_assignments ON (dev_assignments.user_id = users.id) WHERE ticket_id = $1",
-        [ticketId]
-      );
+
+      const rows = await users.findMany({
+        where: {
+          AssignedTickets: {
+            every: {
+              ticketId: Number.parseInt(ticketId)
+            }
+          }
+        }
+      })
 
       res.json(rows);
     } catch (err) {
       console.log("getProjectUsers query error: ", err);
-      res.status(400).json({ msg: "Please review query" });
-    } finally {
-      client.release();
+      res.status(400).json({
+        msg: "Please review query"
+      });
     }
   },
   removeAllDevs: async (req, res) => {
-    const { ticketId } = req.params;
-    const client = await pool.connect();
+    const {
+      ticketId
+    } = req.params;
 
     try {
-      await client.query("DELETE FROM dev_assignments WHERE ticket_id = $1", [
-        ticketId,
-      ]);
+      await userTickets.delete({
+        where: {
+          ticketId
+        }
+      })
 
-      res.status(204).json({ msg: "All devs removed from ticket" });
+      res.status(204).json({
+        msg: "All devs removed from ticket"
+      });
     } catch (err) {
       console.error(err.message);
       res.status(500);
-    } finally {
-      client.release();
     }
   },
 };
