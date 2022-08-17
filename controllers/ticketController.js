@@ -1,67 +1,120 @@
-const pool = require("../db");
+const {
+  userTickets,
+  tickets
+} = require("../prisma/client");
 
 module.exports = {
   createTicket: async (req, res) => {
-    const { projectId } = req.params;
+    const {
+      projectId
+    } = req.params;
     const authorId = req.user;
-    const { title, description, priority, type, status, timeEstimate } =
-      req.body;
-    const client = await pool.connect();
+    console.log("authorId", authorId)
+    const {
+      title,
+      description,
+      priority,
+      type,
+      status,
+      timeEstimate
+    } =
+    req.body;
 
     try {
-      const { rows } = await client.query(
-        "INSERT INTO tickets (title, project_id, description, author_id, priority, type, status, time_estimate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        [
+      const rows = await tickets.create({
+        data: {
           title,
+          description, 
           projectId,
-          description,
-          authorId,
           priority,
           type,
           status,
-          timeEstimate,
-        ]
-      );
+          timeEstimate: Number.parseInt(timeEstimate),
+          authorId
+        },
+      })
 
-      res.json(rows[0]);
+      res.json(rows);
     } catch (err) {
       console.log(`Failed to create ticket for ${title}: `, "\n", err);
-      res.status(500).json({ msg: `Please review query` });
-    } finally {
-      await client.release();
+      res.status(500).json({
+        msg: `Please review query`
+      });
+    }
+  },
+
+
+  getAllTickets: async (req, res) => {
+
+    try {
+      const rows = await tickets.findMany({
+        include:{
+          Project:{
+            select:{
+              name: true
+            }
+          }
+        } 
+      })
+      const result = rows.map(row => {
+        return {...row,projectName: `${row.Project.name}`}
+      });
+
+      res.json(result);
+    } catch (err) {
+      console.log("Error fetching user tickets", err);
     }
   },
   getProjectTickets: async (req, res) => {
-    const { projectId } = req.params;
-    const client = await pool.connect();
+    const {
+      projectId
+    } = req.params;
 
     try {
-      const { rows } = await client.query(
-        "SELECT tickets.id, tickets.title, tickets.description, users.id AS user_id , users.first_name, users.last_name FROM tickets JOIN users ON tickets.author_id = users.id WHERE project_id = $1",
-        [projectId]
-      );
-
-      res.json(rows);
+      const rows = await tickets.findMany({
+        where: {
+          projectId
+        },
+        include: {
+          Author: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      })
+      const data = rows.map(row => {
+        return {
+          ...row,
+          authorName: `${row.Author.firstName} ${row.Author.lastName}`
+        }
+      })
+      res.json(data);
     } catch (err) {
       console.log(
         `Failed to get tickets for project ${projectId}: `,
         "\n",
         err
       );
-      res.status(500).json({ msg: `Please review query` });
-    } finally {
-      await client.release();
+      res.status(500).json({
+        msg: `Please review query`
+      });
     }
   },
   getUserTickets: async (req, res) => {
     const userId = req.user;
-    const client = await pool.connect();
 
     try {
-      const { rows } = await client.query(
-        "SELECT tickets.id, tickets.title, tickets.description, tickets.priority, tickets.status, tickets.type, tickets.time_estimate, tickets.created_at, projects.id AS project_id, projects.name AS project_name FROM tickets JOIN projects ON tickets.project_id = projects.id WHERE tickets.author_id = $1",
-        [userId]
-      );
+      const rows = await tickets.findMany({
+        where: {
+          TicketAssignees: {
+            every: {
+              userId
+            },
+          }
+        }
+      })
 
       res.json(rows);
     } catch (err) {
@@ -69,7 +122,9 @@ module.exports = {
     }
   },
   updateTicket: async (req, res) => {
-    const { ticketId } = req.params;
+    const {
+      ticketId
+    } = req.params;
     const {
       title,
       description,
@@ -88,48 +143,58 @@ module.exports = {
         [title, description, priority, type, status, timeEstimate, ticketId]
       );
 
-      res.status(201).json({ msg: `Ticket ${ticketId} updated successfully` });
+      res.status(201).json({
+        msg: `Ticket ${ticketId} updated successfully`
+      });
     } catch (err) {
       console.log(`Failed to update ticket: `, "\n", err);
-      res.status(500).json({ msg: `Please review query` });
-    } finally {
-      await client.release();
+      res.status(500).json({
+        msg: `Please review query`
+      });
     }
   },
   deleteTicket: async (req, res) => {
-    const { ticketId } = req.params;
-    const client = await pool.connect();
+    const {
+      ticketId
+    } = req.params;
 
     try {
-      await client.query("DELETE FROM dev_assignments WHERE ticket_id = $1", [
-        ticketId,
-      ]);
-      await client.query("DELETE FROM tickets WHERE id = $1", [ticketId]);
+      const deleted = await tickets.delete({
+        where: {
+          id: Number.parseInt(ticketId)
+        }
+      })
+      console.log('deleted', deleted);
 
-      res.status(200).json({ msg: `Ticket ${ticketId} deleted` });
+      res.status(200).json({
+        msg: `Ticket ${ticketId} deleted`
+      });
+
     } catch (err) {
       console.log("Failed to delete ticket: ", "\n", err);
-      res.status(500).json({ msg: "Review deletion query" });
-    } finally {
-      client.release();
+      res.status(500).json({
+        msg: "Review deletion query"
+      });
     }
   },
   getTicket: async (req, res) => {
-    const { ticketId } = req.params;
-    const client = await pool.connect();
+    const {
+      ticketId
+    } = req.params;
 
     try {
-      const { rows } = await client.query(
-        "SELECT tickets.id, tickets.title, tickets.description, tickets.priority, tickets.status, tickets.type, tickets.time_estimate, users.first_name, users.last_name FROM tickets JOIN users ON tickets.author_id = users.id WHERE tickets.id = $1",
-        [ticketId]
-      );
+      const row = tickets.findFirst({
+        where: {
+          ticketId
+        }
+      })
 
-      res.json(rows[0]);
+      res.json(row);
     } catch (err) {
       console.log(`Failed to get ticket for`, "\n", err);
-      res.status(500).json({ msg: `Please review query` });
-    } finally {
-      client.release();
+      res.status(500).json({
+        msg: `Please review query`
+      });
     }
-  },
+  }
 };
