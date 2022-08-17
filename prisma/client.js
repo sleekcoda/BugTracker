@@ -12,6 +12,8 @@ module.exports = {
     comments: prisma.comments,
     tickets: prisma.tickets,
     projects: prisma.projects,
+    userProjects: prisma.userProjects,
+    ticketAssignee: prisma.ticketAssignee,
     query: prisma.$queryRawUnsafe,
     transactions: prisma.$transaction,
     middleware: prisma.$use

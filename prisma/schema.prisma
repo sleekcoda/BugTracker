@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output = "./generated/client"
+  output   = "./generated/client"
 }
 
 datasource db {
@@ -11,81 +11,106 @@ datasource db {
 // TODO Add Models ticket_history and devAssginments
 
 model Users {
-  id               String     @id @default(uuid())
-  email            String     @unique()
-  phone            String     @unique()
-  passwordHash     String
-  lastName         String     @db.VarChar(32)
-  firstName        String     @db.VarChar(32)
-  otherName        String?    @db.VarChar(32)
-  userAuthority    UserRoles  @default(DEVELOPER)
-  createdAt        DateTime   @default(now()) @db.Timestamptz()
-  updatedAt        DateTime   @updatedAt
-  comments         Comments[]
-  projects         Projects[]
-  Tickets          Tickets[]
-  assigned_tickets Tickets[]  @relation("ticketAssigned", map: "assignedTicket")
+  id              String           @id @default(uuid())
+  email           String           @unique()
+  phone           String           @unique()
+  passwordHash    String
+  lastName        String           @db.VarChar(32)
+  firstName       String           @db.VarChar(32)
+  otherName       String?          @db.VarChar(32)
+  userAuthority   UserRoles        @default(DEVELOPER)
+  createdAt       DateTime         @default(now()) @db.Timestamptz()
+  updatedAt       DateTime         @updatedAt
+  Comments        Comments[]
+  Projects        Projects[]
+  UserProjects    UserProjects[]
+  AuthoredTickets Tickets[]
+  AssignedTickets TicketAssignee[]
 
   // @@unique([email, phone])
   @@map(name: "users")
 }
 
 model Tickets {
-  id            Int          @id @default(autoincrement())
-  title         String
-  projectId     String?
-  description   String?      @default("No description")
-  priority      Priorities   @default(LOW)
-  type          TicketType   @default(SUPPORT)
-  status        TicketStatus @default(UNASSIGNED)
-  time_estimate DateTime?    @map("timeEstimate")
-  project       Projects?    @relation(fields: [projectId], references: [id])
-  Comments      Comments[]
-  Users         Users?       @relation(fields: [userId], references: [id])
-  userId        String?
-  assginee      Users?       @relation("ticketAssigned", fields: [assignedTo], references: [id])
-  assignedTo    String?
+  id              Int              @id @default(autoincrement())
+  title           String
+  projectId       String?
+  description     String?          @default("No description")
+  priority        Priorities       @default(LOW)
+  type            TicketType       @default(SUPPORT)
+  status          TicketStatus     @default(NEW)
+  timeEstimate    Int?             @default(0) @map("timeEstimate")
+  Project         Projects?        @relation(fields: [projectId], references: [id])
+  Comments        Comments[]
+  Author          Users?           @relation(fields: [authorId], references: [id])
+  authorId        String
+  TicketAssignees TicketAssignee[]
 
   @@map(name: "tickets")
 }
 
 model Comments {
-  id           Int      @id @default(autoincrement())
-  descriptions String
-  authorId     String
-  ticketId     Int
-  createdAt    DateTime @default(now()) @db.Timestamptz()
-  updatedAt    DateTime @updatedAt
-  user         Users    @relation(fields: [authorId], references: [id])
-  ticket       Tickets  @relation(fields: [ticketId], references: [id])
+  id        Int      @id @default(autoincrement())
+  comment   String
+  authorId  String
+  ticketId  Int
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt
+  Author      Users    @relation(fields: [authorId], references: [id])
+  Ticket    Tickets  @relation(fields: [ticketId], references: [id])
 
   @@map(name: "comments")
 }
 
-// model UserProject {
-//   user_id    Int
-//   project_id Int
+model UserProjects {
+  id        Int    @id @default(autoincrement())
+  userId    String
+  projectId String
 
-//   user    Users    @relation(fields: [user_id], references: [id])
-//   project Projects @relation(fields: [project_id], references: [id])
+  User    Users    @relation(fields: [userId], references: [id])
+  Project Projects @relation(fields: [projectId], references: [id])
 
-//   @@map("user")
+  @@map("userProjects")
+}
+
+// model UserTickets {
+//   id        Int    @id @default(autoincrement())
+//   userId    String
+//   ticketId  Int
+//   projectId String
+
+//   user   Users   @relation(fields: [userId], references: [id])
+//   ticket Tickets @relation(fields: [ticketId], references: [id])
+
+//   @@map("userTickets")
 // }
 
-model Projects {
-  id          String       @id @default(uuid())
-  name        String
-  description String
-  Tickets     Tickets[]
-  Users       Users?    @relation(fields: [userId], references: [id])
-  userId      String?
+model TicketAssignee {
+  id       Int     @id @default(autoincrement())
+  ticketId Int
+  userId   String
+  User     Users   @relation(fields: [userId], references: [id])
+  Ticket   Tickets @relation(fields: [ticketId], references: [id])
+}
 
+model Projects {
+  id           String         @id @default(uuid())
+  name         String
+  description  String
+  Tickets      Tickets[]
+  Users        Users?         @relation(fields: [userId], references: [id])
+  userId       String?
+  UserProjects UserProjects[]
+
+  // ProjectTickets ProjectTickets[]
   @@map("projects")
 }
 
 enum TicketStatus {
-  UNASSIGNED
-  ASSIGNED
+  NEW
+  OPEN
+  IN_PROGRESS
+  RESOLVED
 }
 
 enum UserRoles {
@@ -96,9 +121,9 @@ enum UserRoles {
 
 enum TicketType {
   BUG
-  STORY
-  STORY_POINT
   SUPPORT
+  FEATURE
+  OTHERS
 }
 
 enum Priorities {
