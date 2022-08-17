@@ -1,23 +1,37 @@
-const pool = require("../db");
+const {
+  userProjects,
+  users
+} = require("../prisma/client");
 
 module.exports = {
   getAvailableUsers: async function (req, res) {
-    const client = await pool.connect();
 
-    const { projectId } = req.params;
+    const {
+      projectId
+    } = req.params;
 
     try {
-      const {
-        rows,
-      } = await client.query(
-        "SELECT id, email, first_name, last_name FROM users as U WHERE NOT EXISTS (SELECT user_id FROM user_projects as UP WHERE UP.user_id = U.id AND UP.project_id = $1)",
-        [projectId]
-      );
+      const rows = await users.findMany({
+        select: {
+          firstName: true,
+          lastName: true,
+          phone:true,
+          id:true,
+        },
+        where:{
+          UserProjects: {
+            none:{projectId}
+          } 
+        } 
+        
+      })
 
       res.status(201).json(rows);
     } catch (err) {
       console.log(err);
-      res.send(500).json({ msg: "Failed to fetch available users" });
+      res.send(500).json({
+        msg: "Failed to fetch available users"
+      });
     }
   },
 };
