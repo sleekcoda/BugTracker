@@ -1,6 +1,7 @@
 const {
   projects,
-  query
+  query,
+  userProjects
 } = require("../prisma/client");
 
 module.exports = {
@@ -17,8 +18,6 @@ module.exports = {
       res.status(500).json({
         msg: "Unable to get projects from database"
       });
-    } finally {
-      await client.release();
     }
   },
   getProject: async (req, res) => {
@@ -26,11 +25,12 @@ module.exports = {
       id
     } = req.params;
 
-
     try {
-      const {
-        rows,
-      } = await query("SELECT * FROM projects WHERE id = $1", [id]);
+      const rows = await projects.findFirst({
+        where: {
+          id
+        }
+      })
 
       res.json(rows);
     } catch (e) {
@@ -38,8 +38,6 @@ module.exports = {
       res.status(400).json({
         msg: "Unable to get project from database. Please review query",
       });
-    } finally {
-      await client.release();
     }
   },
   createProject: async (req, res) => {
@@ -75,39 +73,47 @@ module.exports = {
     //Need to delete all rows in tables with foreign keys as well
     try {
       //initialize transaction
-      await query("BEGIN");
+      const deleted = projects.delete({
+        where: {
+          id: projectId
+        },
+        include: {
+          UserProjects: true,
+        }
+      });
+      /*
+            //delete dev_assignments, ticket history, comments from tickets
+            Promise.all([
+              await query(
+                "DELETE FROM dev_assignments WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
+                [projectId]
+              ),
+              await query(
+                "DELETE FROM ticket_history WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
+                [projectId]
+              ),
+              await query(
+                "DELETE FROM comments WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
+                [projectId]
+              ),
+            ]);
 
-      //delete dev_assignments, ticket history, comments from tickets
-      Promise.all([
-        await query(
-          "DELETE FROM dev_assignments WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
-          [projectId]
-        ),
-        await query(
-          "DELETE FROM ticket_history WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
-          [projectId]
-        ),
-        await query(
-          "DELETE FROM comments WHERE ticket_id IN (SELECT id FROM tickets WHERE project_id = $1)",
-          [projectId]
-        ),
-      ]);
+            //delete tickets, user_projects from projects
+            Promise.all([
+              await query("DELETE FROM tickets WHERE project_id = $1", [
+                projectId,
+              ]),
+              await query("DELETE FROM user_projects WHERE project_id = $1", [
+                projectId,
+              ]),
+            ]);
 
-      //delete tickets, user_projects from projects
-      Promise.all([
-        await query("DELETE FROM tickets WHERE project_id = $1", [
-          projectId,
-        ]),
-        await query("DELETE FROM user_projects WHERE project_id = $1", [
-          projectId,
-        ]),
-      ]);
+            //delete project
+            await query("DELETE FROM projects WHERE id = $1", [projectId]);
 
-      //delete project
-      await query("DELETE FROM projects WHERE id = $1", [projectId]);
-
+            */
       //if no errors, commit the transaction
-      await query("COMMIT");
+      // await query("COMMIT");
 
       res.status(200).json({
         msg: `Project ${projectId} and associated tickets/team data succesfully deleted`,
@@ -132,10 +138,15 @@ module.exports = {
 
 
     try {
-      const updateProject = await query(
-        "UPDATE projects SET (name, description) = ($1, $2) WHERE id = $3",
-        [name, description, id]
-      );
+      const updateProject = await projects.update({
+        where: {
+          id
+        },
+        data: {
+          name,
+          description
+        }
+      })
 
       res.json(`Project: ${name} updated successfully`);
     } catch (e) {
@@ -147,4 +158,21 @@ module.exports = {
       await client.release();
     }
   },
+
+  addUserToProject: async (req, res) => {
+    const {
+      projectId
+    } = req.params;
+    const userId = req.body.userId;
+
+    try {
+      const rows = await userProjects.create({
+        userId,
+        projectId
+      })
+      res.json(rows)
+    } catch (err) {
+      res.status(500).send({msg:"Review assign user to project query"})
+    }
+  }
 };
